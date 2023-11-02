@@ -1,0 +1,70 @@
+options {
+  STATIC = false; // You can set it to true if you want a static parser
+}
+
+PARSER_BEGIN(MyParser)
+
+import java.util.*;
+
+public class MyParser {
+  public static void main(String[] args) throws ParseException {
+    MyParser parser = new MyParser(System.in);
+    parser.program();
+  }
+}
+
+PARSER_END(MyParser)
+
+TOKEN : // Define your tokens here
+{
+  <VAR: "var">
+| <OUT: "out">
+| <PRINT: "print">
+| <ID: (["a"-"z","A"-"Z"])+>
+| <NUM: (["0"-"9"])+>
+| <OP: ("+" | "-" | "*" | "/" | "^")>
+| <LPAREN: "(">
+| <RPAREN: ")">
+| <LBRACE: "{">
+| <RBRACE: "}">
+| <COMMA: ",">
+| <ARROW: "->">
+}
+
+void program() : {}
+{
+  (stmt())*
+}
+
+void stmt() : {}
+{
+  <VAR> <ID> "=" expr()
+| <OUT> expr()
+| <PRINT> "string"
+}
+
+void expr() : {}
+{
+  factor() ( <OP> factor() )*
+}
+
+void factor() : {}
+{
+  <LPAREN> expr() <RPAREN>
+| <ID>
+| <LBRACE> expr() <COMMA> expr() <RBRACE>
+| <NUM>
+| map()
+| reduce()
+}
+
+void map() : {}
+{
+  <LBRACE> expr() <COMMA> <ID> <ARROW> expr() <RBRACE>
+}
+
+void reduce() : {}
+{
+  <LBRACE> expr() <COMMA> expr() <COMMA> <ID> <ID> <ARROW> expr() <RBRACE>
+}
+
