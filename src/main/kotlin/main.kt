@@ -63,15 +63,15 @@ object MyGrammar : Grammar<Any>() {
     val number by num use { text.toInt() }
 
     val namedVariable by -varToken * parser(this::id) * -equal * parser(this::subSumChain) map {
-        Variable(it.t1.text, it.t2).also { newVar -> varMap[newVar.name] = newVar
+        Variable(it.t1.text, it.t2).also { newVar ->
+            varMap[newVar.name] = newVar
             println(varMap)
         }
     } or (parser(this::id) * -equal * parser(this::subSumChain) use {
         try {
-            varMap[this.t1.text]!!.value =  this.t2
+            varMap[this.t1.text]!!.value = this.t2
             varMap[this.t1.text]!!
-        }
-        catch (e: NullPointerException) {
+        } catch (e: NullPointerException) {
             println("Undefined variable ${this.t1.text}\nYou need to define variable before using it!!!!!!!!!!")
             Variable("hui", 0).also { exitProcess(1) }
         }
@@ -80,18 +80,24 @@ object MyGrammar : Grammar<Any>() {
 
     val variable by (namedVariable use { value }) or
             (parser(this::id) use {
-                try   {varMap[text]!!.value }
-                catch (e: NullPointerException) {
-                    println("Undefined variable ${this.text}\nYou need to define variable before using it!!!!!!!!!!").also { exitProcess(1) }
+                try {
+                    varMap[text]!!.value
+                } catch (e: NullPointerException) {
+                    println("Undefined variable ${this.text}\nYou need to define variable before using it!!!!!!!!!!").also {
+                        exitProcess(
+                            1
+                        )
+                    }
                     0
-                } })
+                }
+            })
 //    val printValue by (-print * -doubleQuote * parser(this::id) * -doubleQuote) map { println(it.text)
 //        0}
 
     val str: Parser<String> by (skip(print) and skip(doubleQuote) and parser(this::id) and skip(doubleQuote) map {
         println(it.text)
-        it.text })
-
+        it.text
+    })
 
 
     val term: Parser<Int> by number or
@@ -110,7 +116,6 @@ object MyGrammar : Grammar<Any>() {
     }
 
 
-
     override val rootParser: Parser<Int> by subSumChain
 }
 
@@ -126,7 +131,7 @@ fun main(args: Array<String>) {
         var d = 10
         d = 20
         var c = a + d"""
-    for (i in expr.lines()){
-        if (i!= "") println(MyGrammar.parseToEnd(i))
+    for (i in expr.lines()) {
+        if (i != "") println(MyGrammar.parseToEnd(i))
     }
 }
