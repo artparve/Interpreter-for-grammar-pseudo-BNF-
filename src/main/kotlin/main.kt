@@ -2,8 +2,6 @@ package com.example
 
 //import com.example.BooleanGrammar.getValue
 //import com.example.BooleanGrammar.provideDelegate
-import kotlin.Exception
-import java.lang.NullPointerException
 import com.github.h0tk3y.betterParse.combinators.*
 import com.github.h0tk3y.betterParse.grammar.Grammar
 import com.github.h0tk3y.betterParse.grammar.parseToEnd
@@ -11,8 +9,6 @@ import com.github.h0tk3y.betterParse.grammar.parser
 import com.github.h0tk3y.betterParse.lexer.literalToken
 import com.github.h0tk3y.betterParse.lexer.regexToken
 import com.github.h0tk3y.betterParse.parser.Parser
-import java.awt.SystemColor.text
-import java.util.concurrent.Executors
 import kotlin.math.pow
 import kotlin.system.exitProcess
 
@@ -32,7 +28,7 @@ data class Number(val value: Int) : IntExpression()
 
 object MyGrammar : Grammar<Any>() {
     //    val tru by literalToken("true")
-//    val fal by literalToken("false")
+    //    val fal by literalToken("false")
     val varToken by literalToken("var")
     val equal by literalToken("=")
     val map by literalToken("map")
@@ -54,8 +50,8 @@ object MyGrammar : Grammar<Any>() {
     val varMap = mutableMapOf<String, Variable>()
 
     //    val not by literalToken("!")
-//    val and by literalToken("&")
-//    val or by literalToken("|")
+    //    val and by literalToken("&")
+    //    val or by literalToken("|")
     val impl by literalToken("->")
     val ws by regexToken("\\s+", ignore = true)
 
@@ -65,7 +61,7 @@ object MyGrammar : Grammar<Any>() {
     val namedVariable by -varToken * parser(this::id) * -equal * parser(this::subSumChain) map {
         Variable(it.t1.text, it.t2).also { newVar ->
             varMap[newVar.name] = newVar
-            println(varMap)
+//            println(varMap)
         }
     } or (parser(this::id) * -equal * parser(this::subSumChain) use {
         try {
@@ -73,10 +69,19 @@ object MyGrammar : Grammar<Any>() {
             varMap[this.t1.text]!!
         } catch (e: NullPointerException) {
             println("Undefined variable ${this.t1.text}\nYou need to define variable before using it!!!!!!!!!!")
-            Variable("hui", 0).also { exitProcess(1) }
+            exitProcess(1)
+//            Variable("any", 0)
         }
     })
 
+    val printText by -print * -doubleQuote * parser(this::id) * -ws * -equal * -ws * -doubleQuote use {
+        try {
+            println("${this.text} = ${varMap[this.text]!!.value} ")
+        } catch (e: NullPointerException) {
+            println("Undefined variable ${this.text}\nYou need to define variable before using it!!!!!!!!!!")
+        }
+        0
+    }
 
     val variable by (namedVariable use { value }) or
             (parser(this::id) use {
@@ -91,13 +96,6 @@ object MyGrammar : Grammar<Any>() {
                     0
                 }
             })
-//    val printValue by (-print * -doubleQuote * parser(this::id) * -doubleQuote) map { println(it.text)
-//        0}
-
-    val str: Parser<String> by (skip(print) and skip(doubleQuote) and parser(this::id) and skip(doubleQuote) map {
-        println(it.text)
-        it.text
-    })
 
 
     val term: Parser<Int> by number or
@@ -116,22 +114,22 @@ object MyGrammar : Grammar<Any>() {
     }
 
 
-    override val rootParser: Parser<Int> by subSumChain
+    override val rootParser: Parser<Int> by subSumChain or printText
 }
 
-//fun test(){
-//    check(MyGrammar.parseToEnd("var a = 6 + 5 * 10").toString() == "56")
-//    check(MyGrammar.parseToEnd("var d = 10").toString() == "10")
-//    check(MyGrammar.parseToEnd("var a = 6 + 5 * 10").toString() == "56")
-//}
 
 fun main(args: Array<String>) {
     val expr = """
         var a = 6 + 5 * 10
         var d = 10
-        d = 20
-        var c = a + d"""
+        print "a = "
+        var c = a + d
+        print "c = "
+        """
+//    for (i in expr.lines()) {
+//        if (i != "") println(MyGrammar.parseToEnd(i))
+//    }
     for (i in expr.lines()) {
-        if (i != "") println(MyGrammar.parseToEnd(i))
+        if (i != "") MyGrammar.parseToEnd(i)
     }
 }
