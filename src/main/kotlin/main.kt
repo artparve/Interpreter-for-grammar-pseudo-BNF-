@@ -21,10 +21,17 @@ object TRUE : BooleanExpression()
 object FALSE : BooleanExpression()
 data class Variable(val name: String, public var value: Int) : VariableExpression()
 data class Number(val value: Int) : IntExpression()
+
 //data class Not(val body: BooleanExpression) : BooleanExpression()
 //data class And(val left: BooleanExpression, val right: BooleanExpression) : BooleanExpression()
 //data class Or(val left: BooleanExpression, val right: BooleanExpression) : BooleanExpression()
 //data class Impl(val left: BooleanExpression, val right: BooleanExpression) : BooleanExpression()
+fun customExit(name: String, e: Exception) {
+    println(
+        "\tError massage - $e\n" +
+                "Undefined variable $name\nYou need to define variable before using it!!!!!!!!!!"
+    )
+}
 
 object MyGrammar : Grammar<Any>() {
     //    val tru by literalToken("true")
@@ -68,19 +75,19 @@ object MyGrammar : Grammar<Any>() {
             varMap[this.t1.text]!!.value = this.t2
             varMap[this.t1.text]!!
         } catch (e: NullPointerException) {
-            println("Undefined variable ${this.t1.text}\nYou need to define variable before using it!!!!!!!!!!")
+            customExit(this.t1.text, e)
             exitProcess(1)
-//            Variable("any", 0)
         }
     })
 
     val printText by -print * -doubleQuote * parser(this::id) * -ws * -equal * -ws * -doubleQuote use {
         try {
             println("${this.text} = ${varMap[this.text]!!.value} ")
+            0
         } catch (e: NullPointerException) {
-            println("Undefined variable ${this.text}\nYou need to define variable before using it!!!!!!!!!!")
+            customExit(this.text, e)
+            exitProcess(1)
         }
-        0
     }
 
     val variable by (namedVariable use { value }) or
@@ -88,12 +95,8 @@ object MyGrammar : Grammar<Any>() {
                 try {
                     varMap[text]!!.value
                 } catch (e: NullPointerException) {
-                    println("Undefined variable ${this.text}\nYou need to define variable before using it!!!!!!!!!!").also {
-                        exitProcess(
-                            1
-                        )
-                    }
-                    0
+                    customExit(this.text, e)
+                    exitProcess(1)
                 }
             })
 
@@ -121,11 +124,10 @@ object MyGrammar : Grammar<Any>() {
 fun main(args: Array<String>) {
     val expr = """
         var a = 6 + 5 * 10
-        var d = 10
-        print "a = "
-        var c = a + d
-        print "c = "
-        """
+        var g = 10
+        print "g = "
+        var c = g + d
+        print "c = """"
 //    for (i in expr.lines()) {
 //        if (i != "") println(MyGrammar.parseToEnd(i))
 //    }
