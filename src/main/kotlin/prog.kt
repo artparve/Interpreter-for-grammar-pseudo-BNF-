@@ -16,7 +16,7 @@ sealed class VariableSequenceExpression
 data class VariableInt(val name: String, var value: Int) : VariableIntExpression()
 data class VariableSequence(val name: String, var value: List<Int>) : VariableSequenceExpression(), List<Int> {
     override val size: Int
-        get() = TODO("Not yet implemented")
+        get() = value.size
 
     override fun contains(element: Int): Boolean {
         TODO("Not yet implemented")
@@ -57,6 +57,17 @@ data class VariableSequence(val name: String, var value: List<Int>) : VariableSe
     override fun subList(fromIndex: Int, toIndex: Int): List<Int> {
         TODO("Not yet implemented")
     }
+
+    fun reduce(zeroElement: Int, operation: String): Int {
+        var result = zeroElement
+        for (element in value) {
+            when (operation) {
+                "+" -> result += element
+                "*" -> result *= element
+            }
+        }
+        return result
+    }
 }
 
 fun customExit(name: String, e: Exception) {
@@ -66,6 +77,7 @@ fun customExit(name: String, e: Exception) {
     )
 }
 
+
 object MyGrammar : Grammar<Any>() {
     private val tru by literalToken("true")
     private val fal by literalToken("false")
@@ -73,10 +85,12 @@ object MyGrammar : Grammar<Any>() {
     private val equal by literalToken("=")
     private val mapToken by literalToken("map")
     private val reduceToken by literalToken("reduce")
+    private val outputToken by literalToken("out")
     private val print by literalToken("print")
-    private val out by literalToken("by")
+//    private val out by literalToken("by")
     private val num by regexToken("-?\\d+")
     private val doubleQuote by literalToken("\"")
+    private val impl by literalToken("->")
     private val mul by literalToken("*")
     private val pow by literalToken("^")
     private val div by literalToken("/")
@@ -91,25 +105,48 @@ object MyGrammar : Grammar<Any>() {
     private val not by literalToken("!")
     private val and by literalToken("&")
     private val or by literalToken("|")
-    private val impl by literalToken("->")
     private val comma by literalToken(",")
     private val ws by regexToken("\\s+", ignore = true)
 
     private val varIntMap = mutableMapOf<String, VariableInt>()
     private val varSeqMap = mutableMapOf<String, VariableSequence>()
 
+    private fun seqValToListInt(t1: Any, t2: Any): List<Int> {
+        val start = if (t1 is TokenMatch) {
+            try {
+                varIntMap[t1.text]!!.value
+            } catch (e: NullPointerException) {
+                customExit(t1.text, e)
+                exitProcess(1)
+            }
+        } else t1 as Int
+        val end = if (t2 is TokenMatch) {
+            try {
+                varIntMap[t2.text]!!.value
+            } catch (e: NullPointerException) {
+                customExit(t2.text, e)
+                exitProcess(1)
+            }
+        } else t2 as Int
+        return (start..end).toList()
+    }
+
     private val number by num use { text.toInt() }
 
-    //TODO Полседовательности пока невозможно переопределить
+    private val sequenceValue by -lfigpar *
+            (number or parser { id }) *
+            -comma *
+            (number or parser { id }) *
+            -rfigpar
 
-    private val namedVariableInt by -varToken * parser { id } * -equal * parser { subSumChain } map {
-        println("Int variable with var")
-        VariableInt(it.t1.text, (it.t2 as Int)).also { newVar ->
+
+    private val namedVariableInt by
+    -varToken * parser { id } * -equal * parser { subSumChain } use {
+        VariableInt(this.t1.text, (this.t2 as Int)).also { newVar ->
             varIntMap[newVar.name] = newVar
-            println(varIntMap)
+//            println(varIntMap)
         }
     } or (parser { id } * -equal * parser { subSumChain } use {
-        println("Int variable without var")
         try {
             varIntMap[this.t1.text]!!.value = (this.t2 as Int)
             varIntMap[this.t1.text]!!
@@ -119,102 +156,16 @@ object MyGrammar : Grammar<Any>() {
         }
     })
 
-    private val namedVariableSequence by -varToken * parser(this::id) * -equal * -lfigpar * (number or parser { id }) * -comma * (number or parser { id }) * -rfigpar map {
-        println("namedVariableSequence vis var!!!!!!!!!!!!!!!!!!!!!!")
-        when {
-            it.t2 is Int && it.t3 is Int -> {
-                VariableSequence(it.t1.text, ((it.t2 as Int)..(it.t3 as Int)).toList()).also { newVar ->
-                    varSeqMap[newVar.name] = newVar
-                    println(varSeqMap)
-                }
-            }
-
-            it.t2 is Int && it.t3 is TokenMatch -> {
-                try {
-                    VariableSequence(
-                        it.t1.text,
-                        ((it.t2 as Int)..varIntMap[(it.t3 as TokenMatch).text]!!.value).toList()
-                    ).also { newVar ->
-                        varSeqMap[newVar.name] = newVar
-                        println(varSeqMap)
-                    }
-                } catch (e: NullPointerException) {
-                    customExit(it.t3.toString(), e)
-                    exitProcess(1)
-                }
-            }
-
-            it.t2 is TokenMatch && it.t3 is Int -> {
-                try {
-                    VariableSequence(
-                        it.t1.text,
-                        (varIntMap[(it.t2 as TokenMatch).text]!!.value..(it.t3 as Int)).toList()
-                    ).also { newVar ->
-                        varSeqMap[newVar.name] = newVar
-                        println(varSeqMap)
-                    }
-                } catch (e: NullPointerException) {
-                    customExit(it.t2.toString(), e)
-                    exitProcess(1)
-                }
-            }
-
-            it.t2 is TokenMatch && it.t3 is TokenMatch -> {
-                try {
-                    VariableSequence(
-                        it.t1.text,
-                        (varIntMap[(it.t2 as TokenMatch).text]!!.value..varIntMap[(it.t3 as TokenMatch).text]!!.value).toList()
-                    ).also { newVar ->
-                        varSeqMap[newVar.name] = newVar
-                        println(varSeqMap)
-                    }
-                } catch (e: NullPointerException) {
-                    customExit(it.t3.toString(), e)
-                    exitProcess(1)
-                }
-            }
-
-            else -> {
-                listOf(0)
-            }
+    private val namedVariableSequence by
+    -varToken * parser(this::id) * -equal * sequenceValue map {
+        VariableSequence(it.t1.text, seqValToListInt(it.t2.t1, it.t2.t2)).also { newVar ->
+            varSeqMap[newVar.name] = newVar
+//            println(varSeqMap)
         }
-
-
-    } or (parser { id } * -equal * -lfigpar * (number or parser { id }) * -comma * (number or parser { id }) * -rfigpar map {
+    } or (parser { id } * -equal * sequenceValue map {
         try {
-            varSeqMap[it.t1.text]!!.value = when {
-                it.t2 is Int && it.t3 is Int -> {
-                    VariableSequence(
-                        it.t1.text,
-                        ((it.t2 as Int)..(it.t3 as Int)).toList()
-                    )
-                }
-
-                it.t2 is Int && it.t3 is TokenMatch -> {
-                    VariableSequence(
-                        it.t1.text,
-                        ((it.t2 as Int)..varIntMap[(it.t3 as TokenMatch).text]!!.value).toList()
-                    )
-                }
-
-                it.t2 is TokenMatch && it.t3 is Int -> {
-                    VariableSequence(
-                        it.t1.text,
-                        (varIntMap[(it.t2 as TokenMatch).text]!!.value..(it.t3 as Int)).toList()
-                    )
-                }
-
-                it.t2 is TokenMatch && it.t3 is TokenMatch -> {
-                    VariableSequence(
-                        it.t1.text,
-                        (varIntMap[(it.t2 as TokenMatch).text]!!.value..varIntMap[(it.t3 as TokenMatch).text]!!.value).toList()
-                    )
-                }
-
-                else -> {
-                    listOf(0)
-                }
-            }
+            varSeqMap[it.t1.text]!!.value = VariableSequence(it.t1.text, seqValToListInt(it.t2.t1, it.t2.t2))
+            varSeqMap[it.t1.text]!!
         } catch (e: NullPointerException) {
             customExit(it.t1.text, e)
             exitProcess(1)
@@ -222,73 +173,34 @@ object MyGrammar : Grammar<Any>() {
     })
 
 
-//    or -varToken * parser(this::id) * -equal * -lfigpar * (number or parser(this::id)) * -comma * (number or parser(this::id)) * -rfigpar map  {
-//        Variable(it.t1.text, it.t2).also { newVar ->
-//            varMap[newVar.name] = newVar
-////            println(varMap)
-//        }
-//    }
-
-//    private val namedVariable by -varToken * parser(this::id) * -equal * parser(this::subSumChain) map {
-//            Variable(thitext, this::t2).also { newVar ->
-//                varMap[newVar.name] = newVar
-////                println(varMap)
-//            }
-////        } else {
-////            try {
-////                print((it.t2 as Tuple2<*, *>).t1.)
-////                val end = (it.t2 as Tuple2<*, *>).t2
-////
-//////                println("$start, $end")
-////                Variable(it.t1.text, ((((it.t2 as Tuple2<Int, Int>).t1) as Int)..(it.t2 as Tuple2<Int, Int>).t2 as Int).toList()).also { newVar ->
-////                    varMap[newVar.name] = newVar
-////                    println(varMap)
-////                }
-////            }catch (e: NullPointerException) {
-////                customExit(it.t2.toString(), e)
-////                exitProcess(1)
-////            }
-////
-////        }
-//    } or ((-lfigpar * (number or parser(this::id)) * -comma * (number or parser(this::id)) * -rfigpar)
-//    or (parser(this::id) * -equal * (parser(this::subSumChain) or (-lfigpar * parser(this::id) * -rfigpar)) use {
-//        try {
-//            varMap[this.t1.text]!!.value = this.t2
-//            varMap[this.t1.text]!!
-//        } catch (e: NullPointerException) {
-//            customExit(this.t1.text, e)
-//            exitProcess(1)
-//        }
-//    })
-
-    private val printText by -print * -doubleQuote * parser(this::id) * -ws * -equal * -ws * -doubleQuote use {
-        try {
-            println("${this.text} = ${varIntMap[this.text]!!.value} ")
-        } catch (e: NullPointerException) {
-            try {
-                println("${this.text} = ${varSeqMap[this.text]!!.value} ")
-            } catch (e: NullPointerException) {
-                customExit(this.text, e)
-                exitProcess(1)
-            }
-        }
-    }
-
-    private val variable by (namedVariableInt use { value }) or
-            (parser(this::id) use {
+    private val variable by ((namedVariableInt use { value }) or
+            (namedVariableSequence use { (this as VariableSequence) }) or
+            (parser(this::id) use {  // already set variable
                 try {
-                    varIntMap[text]!!.value
+                    if (text in varIntMap.keys) {
+                        varIntMap[text]!!.value
+                    } else {
+                        varSeqMap[text]!!
+                    }
                 } catch (e: NullPointerException) {
                     customExit(this.text, e)
                     exitProcess(1)
                 }
             })
+            )
 
-//    private val seqVariable by ()
+    private val seqVariable: Parser<VariableSequence> by (variable use { (this as VariableSequence) }) or
+            (sequenceValue map { VariableSequence("", seqValToListInt(it.t1, it.t2)) })
+
+    // reduce ( someSeq , Int , x y -> x operation y )
+    private val reduce by (
+            -reduceToken * -lpar * seqVariable * -comma * number * -comma * -id * -id * -impl * -id * (plus or mul) * -id * -rpar map {
+                it.t1.reduce(it.t2, (it.t3).text)
+            })
 
     private val term: Parser<Any> by number or
             (skip(minus) and parser(::term) map { it }) or
-            variable or
+            variable or reduce or
             (skip(lpar) and parser(::rootParser) and skip(rpar))
 
     private val powChain by leftAssociative(term, pow) { a, _, b ->
@@ -303,27 +215,36 @@ object MyGrammar : Grammar<Any>() {
         if (op == plus) (a as Int) + (b as Int) else (a as Int) - (b as Int)
     }
 
-//    val str: Parser<String> by (skip(print) and skip(doubleQuote) and parser(this::id) and skip(doubleQuote) map {
-//        println(it.text)
-//        it.text
-//    })
 
-//    private val map by mapToken * lpar *
+    private val printText by
+    // print "smth = "
+    -print * -doubleQuote * parser { id } * -equal * -doubleQuote use {
+        try {
+            if (text in varIntMap.keys) {
+                println("$text = ${varIntMap[text]!!.value} ")
+            } else {
+                println("$text = ${varSeqMap[text]!!.value} ")
+            }
+        } catch (e: NullPointerException) {
+            customExit(this.text, e)
+            exitProcess(1)
+        }
+    }
 
-//    private val reduce by -reduceToken *
-//            -lpar *
-//            (namedVariableSequence or (-lfigpar * (number or parser { id }) * -comma * (number or parser { id }) * -rfigpar)) *
-//            -comma *
-//            number *
-//            parser(this::id) *
-//            -impl *
-//            parser(this::id) *
-//            -rpar map {
-//
-//    }
+    private val output by -outputToken * parser { id } use {
+        try {
+            if (this.text in varIntMap.keys) {
+                println("${varIntMap[text]!!.value}")
+            } else {
+                println("${varSeqMap[text]!!.value}")
+            }
+        } catch (e: NullPointerException) {
+            customExit(this.text, e)
+            exitProcess(1)
+        }
+    }
 
-
-    override val rootParser: Parser<Any> by namedVariableSequence or subSumChain or printText
+    override val rootParser: Parser<Any> by subSumChain or printText or output
 }
 
 
@@ -333,19 +254,23 @@ fun main(args: Array<String>) {
 //    print "g = "
 //    var c = g + d
 //    print "c = "
-    val expr = """
-        var b = 0
-        var c = 10
-        a = {b,c}
-        print "a = "
-        b = 100
-        print "b = "
-        a = {10,100}
-        print "a = """"
-//    for (i in expr.lines()) {
-//        if (i != "") println(MyGrammar.parseToEnd(i))
-//    }
-    for (i in expr.lines()) {
-        if (i != "") MyGrammar.parseToEnd(i)
+    try {
+        val expr = """
+        var t = {1,3}
+        var f = reduce(t, 1, x y -> x * y)
+        print "f = "
+        print "t = "
+        out t"""
+
+
+        for (i in expr.lines()) {
+            if (i != "") MyGrammar.parseToEnd(i)
+        }
+    } catch (e: Exception) {
+        for (i in e.toString().split("AlternativesFailure")) {
+            println(i.substringAfter("(errors=["))
+        }
     }
+
+
 }
