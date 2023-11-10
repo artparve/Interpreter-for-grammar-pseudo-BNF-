@@ -1,0 +1,23 @@
+
+{t=VariableSequence(name=t, value=[1, 2, 3])}
+{f=VariableInt(name=f, value=7)}
+i * 2 + 10)
+i * 2 + 10
+12
+i * 2 + 10
+14
+i * 2 + 10
+16
+i * 2 + 10
+18
+i * 2 + 10
+20
+i * 2 + 10
+22
+i * 2 + 10
+24
+[12, 14, 16, 18, 20, 22, 24]
+{t=VariableSequence(name=t, value=[1, 2, 3]), c=VariableSequence(name=c, value=[12, 14, 16, 18, 20, 22, 24])}
+[12, 14, 16, 18, 20, 22, 24]
+7t =
+[1, 2, 3]

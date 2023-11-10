@@ -1,7 +1,7 @@
 package source
 
 import com.github.h0tk3y.betterParse.grammar.parseToEnd
-import kotlin.math.pow
+import java.io.File
 
 fun main(args: Array<String>) {
 //    var a = 6 + 5 * 10
@@ -10,6 +10,9 @@ fun main(args: Array<String>) {
 //    var c = g + d
 //    print "c = "
     try {
+        val fileContent = File("./input.txt").readText()
+        print(fileContent)
+
         val primal = """
         var n = 500
 var sequence = map({0, n}, i -> (-1)^i / (2.0 * i + 1))
@@ -29,16 +32,12 @@ out pi"""
         """.trimIndent()
         val expr1 = """map({1,n}, i -> 2 * i + 1)"""
 
-        for (i in primal.lines()) {
-            if (i != "") MyGrammar.parseToEnd(i)
+        for (i in expr.lines()) {
+            if (i != "") println(MyGrammar.parseToEnd(i))
         }
     } catch (e: Exception) {
         for (i in e.toString().split("AlternativesFailure")) {
             println(i.substringAfter("(errors=["))
         }
     }
-     for (i in 0..500) {
-         val result = ((-1).toDouble().pow(i.toDouble()) / (2.0 * i + 1))
-         println(result)
-     }
 }

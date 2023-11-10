@@ -1,3 +1,8 @@
+
+
+
+
+
 package source
 
 import com.github.h0tk3y.betterParse.combinators.*
@@ -77,7 +82,7 @@ data class VariableSequence(val name: String, var value: List<Int>) : VariableSe
 }
 
 fun customExit(name: String, e: Exception) {
-    println(
+    MyGrammar.stringBuilder.append("\n" +
         "\tError massage - $e\n" +
                 "Undefined variable $name\nYou need to define variable before using it!!!!!!!!!!"
     )
@@ -85,6 +90,8 @@ fun customExit(name: String, e: Exception) {
 
 
 object MyGrammar : Grammar<Any>() {
+    val stringBuilder = StringBuilder()
+
     private val regexForReduce = """[+*]"""
     private val regexForMap = """->\s*(.+)"""
     private val text by regexToken(""""[^"]*"""")
@@ -138,15 +145,15 @@ object MyGrammar : Grammar<Any>() {
 
     private fun parseMap(variable: String, sequence: VariableSequence, stringForParse: String): VariableSequence {
         val resultOfMap = mutableListOf<Int>()
-        println(stringForParse)
+        MyGrammar.stringBuilder.append("\n" + stringForParse)
         val stringForInput = stringForParse.substring(0, stringForParse.length - 1)
         for (item in sequence.value) {
-            println(stringForInput)
+            MyGrammar.stringBuilder.append("\n" + stringForInput)
             val parser = MyGrammarSimple.parseToEnd(stringForInput.replace(variable, item.toString()))
-            println(parser)
+            MyGrammar.stringBuilder.append("\n" + parser)
             resultOfMap.add(parser)
         }
-        println(resultOfMap)
+        MyGrammar.stringBuilder.append("\n" + resultOfMap)
         return VariableSequence("", resultOfMap)
     }
 
@@ -162,7 +169,7 @@ object MyGrammar : Grammar<Any>() {
     -varToken * parser { id } * -equal * parser { subSumChain } use {
         VariableInt(this.t1.text, (this.t2 as Int)).also { newVar ->
             varIntMap[newVar.name] = newVar
-            println(varIntMap)
+            MyGrammar.stringBuilder.append("\n" + varIntMap)
         }
     } or (parser { id } * -equal * parser { subSumChain } use {
         try {
@@ -178,7 +185,7 @@ object MyGrammar : Grammar<Any>() {
     -varToken * parser{ id } * -equal * (parser { seqVariable} or parser { map }) map {
         VariableSequence(it.t1.text, it.t2.value).also { newVar ->
             varSeqMap[newVar.name] = newVar
-            println(varSeqMap)
+            MyGrammar.stringBuilder.append("\n" + varSeqMap)
         }
     } or (parser { id } * -equal * (parser { seqVariable} or parser { map }) map {
         try {
@@ -218,7 +225,7 @@ object MyGrammar : Grammar<Any>() {
                     val foundSymbol = match.value
                     it.t1.reduce(it.t2, foundSymbol)
                 } else {
-                    println("Undefined operation")
+                    MyGrammar.stringBuilder.append("\n" + "Undefined operation")
                     exitProcess(1)
                 }
             })
@@ -235,7 +242,7 @@ object MyGrammar : Grammar<Any>() {
             val capturedText = match.groups[1]!!.value
             parseMap(it.t2.text, it.t1, capturedText)
         } else {
-            println("No match found")
+            MyGrammar.stringBuilder.append("\n" + "No match found")
             VariableSequence("", listOf())
         }
     }
@@ -263,7 +270,7 @@ object MyGrammar : Grammar<Any>() {
 
     // DONE
     private val printText by -print * text use {
-        print(this.text.substring(1, this.text.length - 1))
+        MyGrammar.stringBuilder.append(this.text.substring(1, this.text.length - 1))
         0
     }
 
@@ -271,9 +278,9 @@ object MyGrammar : Grammar<Any>() {
     private val output by -outputToken * parser { id } use {
         try {
             if (this.text in varIntMap.keys) {
-                println("${varIntMap[text]!!.value}")
+                MyGrammar.stringBuilder.append("\n" + "${varIntMap[text]!!.value}")
             } else {
-                println("${varSeqMap[text]!!.value}")
+                MyGrammar.stringBuilder.append("\n" + "${varSeqMap[text]!!.value}")
             }
         } catch (e: NullPointerException) {
             customExit(this.text, e)
