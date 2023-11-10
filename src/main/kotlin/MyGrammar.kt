@@ -85,19 +85,17 @@ fun customExit(name: String, e: Exception) {
 
 
 object MyGrammar : Grammar<Any>() {
-    private val text by regexToken(""""[^\"]*"""")
-    private val mapLamda by regexToken("""\s*->\s*([a-zA-Z_][a-zA-Z_0-9]*\s*[-+*/%]\s*[a-zA-Z_][a-zA-Z_0-9]*)""") //??????????????????????
-    // TODO Генератор регулярных выражений
+    private val regexForReduce = """[+*]"""
+    private val regexForMap = """->\s*(.+)"""
+    private val text by regexToken(""""[^"]*"""")
+    private val lamda by regexToken("->\\s+[a-zA-Z\\d+\\.\\s+*^/\\-()]+\\)")
     private val varToken by literalToken("var")
     private val equal by literalToken("=")
     private val mapToken by literalToken("map")
     private val reduceToken by literalToken("reduce")
     private val outputToken by literalToken("out")
     private val print by literalToken("print")
-    //    private val out by literalToken("by")
-    private val num by regexToken("-?\\d+")
-    private val doubleQuote by literalToken("\"")
-    private val impl by literalToken("->")
+    private val num by regexToken("-?\\d+(\\.\\d+)?")
     private val mul by literalToken("*")
     private val pow by literalToken("^")
     private val div by literalToken("/")
@@ -107,16 +105,16 @@ object MyGrammar : Grammar<Any>() {
     private val rpar by literalToken(")")
     private val lfigpar by literalToken("{")
     private val rfigpar by literalToken("}")
-    private val id by regexToken("[A-Za-z]+")
+    private val id by regexToken("\\w+")
     private val not by literalToken("!")
     private val comma by literalToken(",")
     private val ws by regexToken("\\s+", ignore = true)
 
-    val any by zeroOrMore( varToken or equal or mapToken or reduceToken or outputToken or print or num or impl or mul or pow or div or minus or plus or lpar or rpar or lfigpar or rfigpar or id or not or comma or ws )
+//    val any by zeroOrMore( varToken or equal or mapToken or reduceToken or outputToken or print or num or impl or mul or pow or div or minus or plus or lpar or rpar or lfigpar or rfigpar or id or not or comma or ws )
 
     private val varIntMap = mutableMapOf<String, VariableInt>()
     private val varSeqMap = mutableMapOf<String, VariableSequence>()
-    private val intUnnamed = mutableMapOf<String, VariableInt>()
+//    private val intUnnamed = mutableMapOf<String, VariableInt>()
 
     private fun seqValToListInt(t1: Any, t2: Any): List<Int> {
         val start = if (t1 is TokenMatch) {
@@ -139,14 +137,17 @@ object MyGrammar : Grammar<Any>() {
     }
 
     private fun parseMap(variable: String, sequence: VariableSequence, stringForParse: String): VariableSequence {
-        val resultOfMap: List<Int> = listOf()
+        val resultOfMap = mutableListOf<Int>()
         println(stringForParse)
-//        println(stringForParse)
+        val stringForInput = stringForParse.substring(0, stringForParse.length - 1)
         for (item in sequence.value) {
-            val parser = MyGrammarSimple.parseToEnd(stringForParse.replace(variable, item.toString()))
-            resultOfMap.plus(parser)
+            println(stringForInput)
+            val parser = MyGrammarSimple.parseToEnd(stringForInput.replace(variable, item.toString()))
+            println(parser)
+            resultOfMap.add(parser)
         }
-        return VariableSequence("",resultOfMap)
+        println(resultOfMap)
+        return VariableSequence("", resultOfMap)
     }
 
     private val number by num use { text.toInt() }
@@ -158,10 +159,10 @@ object MyGrammar : Grammar<Any>() {
             -rfigpar
 
     private val namedVariableInt by
-    -literalToken("var") * parser { id } * -equal * parser { subSumChain } use {
+    -varToken * parser { id } * -equal * parser { subSumChain } use {
         VariableInt(this.t1.text, (this.t2 as Int)).also { newVar ->
             varIntMap[newVar.name] = newVar
-//            println(varIntMap)
+            println(varIntMap)
         }
     } or (parser { id } * -equal * parser { subSumChain } use {
         try {
@@ -174,10 +175,10 @@ object MyGrammar : Grammar<Any>() {
     })
 
     private val namedVariableSequence by
-    -literalToken("var") * parser{ id } * -equal * (parser { seqVariable} or parser { map }) map {
+    -varToken * parser{ id } * -equal * (parser { seqVariable} or parser { map }) map {
         VariableSequence(it.t1.text, it.t2.value).also { newVar ->
             varSeqMap[newVar.name] = newVar
-//            println(varSeqMap)
+            println(varSeqMap)
         }
     } or (parser { id } * -equal * (parser { seqVariable} or parser { map }) map {
         try {
@@ -211,50 +212,58 @@ object MyGrammar : Grammar<Any>() {
 
     // reduce ( someSeq , Int , x y -> x operation y )
     private val reduce by (
-            -reduceToken * -lpar * seqVariable * -comma * number * -comma * -id * -id * -impl * -id * (plus or mul) * -id * -rpar map {
-                it.t1.reduce(it.t2, (it.t3).text)
+            -reduceToken * -lpar * seqVariable * -comma * number * -comma * -id * -id * lamda map {
+                val match = regexForReduce.toRegex().find(it.t3.text)
+                if (match != null) {
+                    val foundSymbol = match.value
+                    it.t1.reduce(it.t2, foundSymbol)
+                } else {
+                    println("Undefined operation")
+                    exitProcess(1)
+                }
             })
 
-    private val map by -mapToken * -lpar * parser { seqVariable } * -comma * id * -impl * parser { regexToken("[+\\-*\\d\\w]+") }* -rpar map {
-//        parseMap(it.t2.text, it.t1, it.t3.text)
-
-        println(it.t3)
-        VariableSequence("t", listOf())
+    private val map by -mapToken * -lpar * parser { seqVariable } * -comma * id * lamda map {
+        val match = regexForMap.toRegex().find(it.t3.text)
+//        try {
+//            val capturedText = match.groups[1]!!.value
+//            parseMap(it.t2.text, it.t1, capturedText)
+//        } catch (e) {
+//
+//        }
+        if (match != null) {
+            val capturedText = match.groups[1]!!.value
+            parseMap(it.t2.text, it.t1, capturedText)
+        } else {
+            println("No match found")
+            VariableSequence("", listOf())
+        }
     }
 
-    private val term: Parser<Any> by number or
+    //DONE
+    private val term: Parser<Any> by number  or
             (skip(minus) and parser(::term) map { it }) or
-            variable or reduce or map or
+            variable or reduce or
             (skip(lpar) and parser(::rootParser) and skip(rpar))
 
+    //DONE
     private val powChain by leftAssociative(term, pow) { a, _, b ->
         (a as Int).toDouble().pow((b as Int).toDouble()).toInt()
     }
 
+    //DONE
     private val divMulChain by leftAssociative(powChain, div or mul use { type }) { a, op, b ->
         if (op == div) (a as Int) / (b as Int) else (a as Int) * (b as Int)
     }
 
+    //DONE
     private val subSumChain by leftAssociative(divMulChain, plus or minus use { type }) { a, op, b ->
         if (op == plus) (a as Int) + (b as Int) else (a as Int) - (b as Int)
     }
 
-    private val func by id * -impl map {
-
-    }
-
-    val str: Parser<String> by (skip(print) and skip(doubleQuote) and parser(this::id) and skip(doubleQuote) map {
-        println(it.text)
-        it.text })
-
-    private val printTextTestMap by -mapToken * -lpar * parser { seqVariable } * -comma * id * mapLamda * -rpar map  {
-        println(it.t3.text)
-        0
-    }
-
     // DONE
     private val printText by -print * text use {
-        println(this.text.substring(1, this.text.length - 1))
+        print(this.text.substring(1, this.text.length - 1))
         0
     }
 
@@ -272,5 +281,5 @@ object MyGrammar : Grammar<Any>() {
         }
     }
 
-    override val rootParser: Parser<Any> by printTextTestMap // subSumChain or printText or output
+    override val rootParser: Parser<Any> by subSumChain or printText  or output
 }

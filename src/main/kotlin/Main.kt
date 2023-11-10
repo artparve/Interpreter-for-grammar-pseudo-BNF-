@@ -1,6 +1,7 @@
 package source
 
 import com.github.h0tk3y.betterParse.grammar.parseToEnd
+import kotlin.math.pow
 
 fun main(args: Array<String>) {
 //    var a = 6 + 5 * 10
@@ -9,19 +10,26 @@ fun main(args: Array<String>) {
 //    var c = g + d
 //    print "c = "
     try {
-        val expr1 = """
+        val primal = """
+        var n = 500
+var sequence = map({0, n}, i -> (-1)^i / (2.0 * i + 1))
+var pi = 4 * reduce(sequence, 0, x y -> x + y)
+print "pi = "
+out pi"""
+        val expr = """
         var t = {1,3}
-        var f = reduce(t, 1, x y -> x * y)
-        print "f = "
+        var f = reduce(t, 1, x y -> x + y)
+        var c = map({1,f}, i -> i * 2 + 10)
+        out c
+        out f
         print "t = "
-        out t
-        var m = map(t, i -> i * 2)"""
+        out t"""
         val expr3 = """
             map({1,3}, i -> 2*i)
         """.trimIndent()
-        val expr = """map({1,3}, i -> i * 2)""""
+        val expr1 = """map({1,n}, i -> 2 * i + 1)"""
 
-        for (i in expr.lines()) {
+        for (i in primal.lines()) {
             if (i != "") MyGrammar.parseToEnd(i)
         }
     } catch (e: Exception) {
@@ -29,6 +37,8 @@ fun main(args: Array<String>) {
             println(i.substringAfter("(errors=["))
         }
     }
-
-
+     for (i in 0..500) {
+         val result = ((-1).toDouble().pow(i.toDouble()) / (2.0 * i + 1))
+         println(result)
+     }
 }

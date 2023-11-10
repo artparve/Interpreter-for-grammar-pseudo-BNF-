@@ -6,11 +6,13 @@ import com.github.h0tk3y.betterParse.grammar.parser
 import com.github.h0tk3y.betterParse.lexer.literalToken
 import com.github.h0tk3y.betterParse.lexer.regexToken
 import com.github.h0tk3y.betterParse.parser.Parser
+import source.MyGrammarSimple.getValue
+import source.MyGrammarSimple.provideDelegate
 import kotlin.math.pow
 
 
-object MyGrammarSimple : Grammar<Any>() {
-    val num by regexToken("-?\\d+")
+object MyGrammarSimple : Grammar<Int>() {
+    val num by regexToken("-?\\d+(.\\d+)?")
     val lpar by literalToken("(")
     val rpar by literalToken(")")
     val mul by literalToken("*")
@@ -20,7 +22,9 @@ object MyGrammarSimple : Grammar<Any>() {
     val plus by literalToken("+")
     val ws by regexToken("\\s+", ignore = true)
 
-    val number by num use { text.toInt() }
+    val number by num use {
+        println(text)
+        text.toDouble().toInt() }
     val term: Parser<Int> by number or
             (skip(minus) and parser(::term) map { -it }) or
             (skip(lpar) and parser(::rootParser) and skip(rpar))
@@ -37,3 +41,9 @@ object MyGrammarSimple : Grammar<Any>() {
 
     override val rootParser: Parser<Int> by subSumChain
 }
+
+/*
+private val map by -MyGrammar.mapToken * -MyGrammar.lpar * parser { MyGrammar.seqVariable } * -MyGrammar.comma * MyGrammar.id * MyGrammar.mapLamda * -MyGrammar.rpar map {
+    println(it.t3)
+    VariableSequence("t", listOf())
+}*/
