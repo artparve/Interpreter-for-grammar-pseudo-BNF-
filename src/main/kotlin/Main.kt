@@ -3,9 +3,10 @@ package source
 import com.github.h0tk3y.betterParse.grammar.parseToEnd
 import java.io.File
 
-fun main(args: Array<String>) {
+const val PATH = "./src/main/resources/"
+fun main() {
     try {
-        val fileContent = File("./src/main/resources/input.txt").readText()
+        val fileContent = File(PATH + "input.txt").readText()
 
         for (i in fileContent.lines()) {
             if (i != "") MyGrammar.parseToEnd(i)

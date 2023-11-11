@@ -8,18 +8,12 @@ import com.github.h0tk3y.betterParse.lexer.TokenMatch
 import com.github.h0tk3y.betterParse.lexer.literalToken
 import com.github.h0tk3y.betterParse.lexer.regexToken
 import com.github.h0tk3y.betterParse.parser.Parser
-import source.MyGrammar.getValue
-import source.MyGrammar.provideDelegate
-import kotlin.math.min
-//import com.github.h0tk3y.betterParse.parser.parse
-//import source.MyGrammar.getValue
-//import source.MyGrammar.provideDelegate
 import kotlin.math.pow
 import kotlin.system.exitProcess
 
-sealed class VariableIntExpression
+sealed class VariableExpression
 sealed class VariableSequenceExpression
-data class VariableInt(val name: String, var value: Int) : VariableIntExpression()
+data class Variable(val name: String, var value: Double) : VariableExpression()
 data class VariableSequence(val name: String, var value: List<Int>) : VariableSequenceExpression(), List<Int> {
     override val size: Int
         get() = value.size
@@ -64,15 +58,15 @@ data class VariableSequence(val name: String, var value: List<Int>) : VariableSe
         TODO("Not yet implemented")
     }
 
-    fun reduce(zeroElement: Int, operation: String): Int {
+    fun reduce(zeroElement: Double, operation: String): Double {
         var result = zeroElement
         for (element in value) {
             when (operation) {
-                "+" -> result += element
-                "*" -> result *= element
+                "+" -> result += element.toDouble()
+                "*" -> result *= element.toDouble()
             }
         }
-        return result
+        return result.toDouble()
     }
 }
 
@@ -83,12 +77,29 @@ fun customExit(name: String, e: Exception) {
     )
 }
 
+fun checkForInt(value: Double): Boolean {
+    return value % 1 < 0.01
+}
+
+fun convertoInt(value: Double): Int {
+    return if (checkForInt(value)) {
+        value.toInt()
+    } else {
+        typemismatch(Double, Int)
+        exitProcess(1)
+    }
+}
+
+fun <T, E> typemismatch(actual: T, expected: E) {
+    println("\tType mismatch: expected: $expected, given: $actual")
+}
+
 
 object MyGrammar : Grammar<Any>() {
     private val regexForReduce = """[+*]"""
     private val regexForMap = """->\s*(.+)"""
     private val text by regexToken(""""[^"]*"""")
-    private val lamda by regexToken("->\\s+[a-zA-Z\\d+\\.\\s+*^/\\-()]+\\)")
+    private val lamda by regexToken("->\\s+[a-zA-Z\\d+.\\s*^/\\-()]+\\)")
     private val varToken by literalToken("var")
     private val equal by literalToken("=")
     private val mapToken by literalToken("map")
@@ -110,30 +121,24 @@ object MyGrammar : Grammar<Any>() {
     private val comma by literalToken(",")
     private val ws by regexToken("\\s+", ignore = true)
 
-//    val any by zeroOrMore( varToken or equal or mapToken or reduceToken or outputToken or print or num or impl or mul or pow or div or minus or plus or lpar or rpar or lfigpar or rfigpar or id or not or comma or ws )
-
-    private val varIntMap = mutableMapOf<String, VariableInt>()
+    private val varMap = mutableMapOf<String, Variable>()
     private val varSeqMap = mutableMapOf<String, VariableSequence>()
-//    private val intUnnamed = mutableMapOf<String, VariableInt>()
+
+    private fun anyToInt(t: Any): Int {
+        return if (t is TokenMatch) {
+            try {
+                convertoInt(varMap[t.text]!!.value)
+            } catch (e: NullPointerException) {
+                customExit(t.text, e)
+                exitProcess(1)
+            }
+        } else {
+            convertoInt(t as Double)
+        }
+    }
 
     private fun seqValToListInt(t1: Any, t2: Any): List<Int> {
-        val start = if (t1 is TokenMatch) {
-            try {
-                varIntMap[t1.text]!!.value
-            } catch (e: NullPointerException) {
-                customExit(t1.text, e)
-                exitProcess(1)
-            }
-        } else t1 as Int
-        val end = if (t2 is TokenMatch) {
-            try {
-                varIntMap[t2.text]!!.value
-            } catch (e: NullPointerException) {
-                customExit(t2.text, e)
-                exitProcess(1)
-            }
-        } else t2 as Int
-        return (start..end).toList()
+        return (anyToInt(t1)..anyToInt(t2)).toList()
     }
 
     private fun parseMap(variable: String, sequence: VariableSequence, stringForParse: String): VariableSequence {
@@ -146,7 +151,7 @@ object MyGrammar : Grammar<Any>() {
         return VariableSequence("", resultOfMap)
     }
 
-    private val number by num use { text.toInt() }
+    private val number by num use { text.toDouble() }
 
     private val sequenceValue by -lfigpar *
             (number or parser { id }) *
@@ -154,15 +159,15 @@ object MyGrammar : Grammar<Any>() {
             (number or parser { id }) *
             -rfigpar
 
-    private val namedVariableInt by
+    private val namedVariable by
     -varToken * parser { id } * -equal * parser { subSumChain } use {
-        VariableInt(this.t1.text, (this.t2 as Int)).also { newVar ->
-            varIntMap[newVar.name] = newVar
+        Variable(this.t1.text, (this.t2 as Double)).also { newVar ->
+            varMap[newVar.name] = newVar
         }
     } or (parser { id } * -equal * parser { subSumChain } use {
         try {
-            varIntMap[this.t1.text]!!.value = (this.t2 as Int)
-            varIntMap[this.t1.text]!!
+            varMap[this.t1.text]!!.value = (this.t2 as Double)
+            varMap[this.t1.text]!!
         } catch (e: NullPointerException) {
             customExit(this.t1.text, e)
             exitProcess(1)
@@ -170,11 +175,11 @@ object MyGrammar : Grammar<Any>() {
     })
 
     private val namedVariableSequence by
-    -varToken * parser{ id } * -equal * (parser { seqVariable} or parser { map }) map {
+    -varToken * parser { id } * -equal * (parser { seqVariable } or parser { map }) map {
         VariableSequence(it.t1.text, it.t2.value).also { newVar ->
             varSeqMap[newVar.name] = newVar
         }
-    } or (parser { id } * -equal * (parser { seqVariable} or parser { map }) map {
+    } or (parser { id } * -equal * (parser { seqVariable } or parser { map }) map {
         try {
             varSeqMap[it.t1.text]!!.value = VariableSequence(it.t1.text, it.t2.value)
             varSeqMap[it.t1.text]!!
@@ -185,12 +190,12 @@ object MyGrammar : Grammar<Any>() {
     })
 
 
-    private val variable by ((namedVariableInt use { value }) or
+    private val variable by ((namedVariable use { value }) or
             (namedVariableSequence use { this }) or
             (parser(this::id) use {  // already set variable
                 try {
-                    if (text in varIntMap.keys) {
-                        varIntMap[text]!!.value
+                    if (text in varMap.keys) {
+                        varMap[text]!!.value
                     } else {
                         varSeqMap[text]!!
                     }
@@ -229,24 +234,24 @@ object MyGrammar : Grammar<Any>() {
     }
 
     //DONE
-    private val term: Parser<Any> by number  or
+    private val term: Parser<Any> by number or
             (skip(minus) and parser(::term) map { it }) or
             variable or reduce or
             (skip(lpar) and parser(::rootParser) and skip(rpar))
 
     //DONE
     private val powChain by leftAssociative(term, pow) { a, _, b ->
-        (a as Int).toDouble().pow((b as Int).toDouble()).toInt()
+        (a as Double).pow(b as Double)
     }
 
     //DONE
     private val divMulChain by leftAssociative(powChain, div or mul use { type }) { a, op, b ->
-        if (op == div) (a as Int) / (b as Int) else (a as Int) * (b as Int)
+        if (op == div) (a as Double) / (b as Double) else (a as Double) * (b as Double)
     }
 
     //DONE
     private val subSumChain by leftAssociative(divMulChain, plus or minus use { type }) { a, op, b ->
-        if (op == plus) (a as Int) + (b as Int) else (a as Int) - (b as Int)
+        if (op == plus) (a as Double) + (b as Double) else (a as Double) - (b as Double)
     }
 
     // DONE
@@ -258,8 +263,12 @@ object MyGrammar : Grammar<Any>() {
     //DONE
     private val output by -outputToken * parser { id } use {
         try {
-            if (this.text in varIntMap.keys) {
-                println("${varIntMap[text]!!.value}")
+            if (this.text in varMap.keys) {
+                if (checkForInt(varMap[text]!!.value)) {
+                    println(convertoInt(varMap[text]!!.value))
+                } else {
+                    println(varMap[text]!!.value)
+                }
             } else {
                 println("${varSeqMap[text]!!.value}")
             }
@@ -269,5 +278,5 @@ object MyGrammar : Grammar<Any>() {
         }
     }
 
-    override val rootParser: Parser<Any> by subSumChain or printText  or output
+    override val rootParser: Parser<Any> by subSumChain or printText or output
 }

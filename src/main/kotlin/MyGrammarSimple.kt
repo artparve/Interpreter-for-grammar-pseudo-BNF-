@@ -6,8 +6,6 @@ import com.github.h0tk3y.betterParse.grammar.parser
 import com.github.h0tk3y.betterParse.lexer.literalToken
 import com.github.h0tk3y.betterParse.lexer.regexToken
 import com.github.h0tk3y.betterParse.parser.Parser
-import source.MyGrammarSimple.getValue
-import source.MyGrammarSimple.provideDelegate
 import kotlin.math.pow
 
 
@@ -23,7 +21,9 @@ object MyGrammarSimple : Grammar<Int>() {
     val ws by regexToken("\\s+", ignore = true)
 
     val number by num use {
-        text.toDouble().toInt() }
+        convertoInt(text.toDouble())
+    }
+
     val term: Parser<Int> by number or
             (skip(minus) and parser(::term) map { -it }) or
             (skip(lpar) and parser(::rootParser) and skip(rpar))
