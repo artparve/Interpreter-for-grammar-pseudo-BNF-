@@ -10,26 +10,18 @@ fun main(args: Array<String>) {
 //    var c = g + d
 //    print "c = "
     try {
-        val primal = """
-        var n = 500
-var sequence = map({0, n}, i -> (-1)^i / (2.0 * i + 1))
-var pi = 4 * reduce(sequence, 0, x y -> x + y)
-print "pi = "
-out pi"""
         val expr = """
         var t = {1,3}
+        var d = 9.8
         var f = reduce(t, 1, x y -> x + y)
-        var c = map({1,f}, i -> i * 2 + 10)
+        var c = map({1,f}, i -> i * 2.0 + 10.0  )
+        out d
         out c
         out f
         print "t = "
         out t"""
-        val expr3 = """
-            map({1,3}, i -> 2*i)
-        """.trimIndent()
-        val expr1 = """map({1,n}, i -> 2 * i + 1)"""
 
-        for (i in primal.lines()) {
+        for (i in expr.lines()) {
             if (i != "") MyGrammar.parseToEnd(i)
         }
     } catch (e: Exception) {
@@ -37,8 +29,4 @@ out pi"""
             println(i.substringAfter("(errors=["))
         }
     }
-     for (i in 0..500) {
-         val result = ((-1).toDouble().pow(i.toDouble()) / (2.0 * i + 1))
-         println(result)
-     }
 }

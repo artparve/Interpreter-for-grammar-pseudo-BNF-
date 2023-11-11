@@ -17,9 +17,9 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.system.exitProcess
 
-sealed class VariableIntExpression
+sealed class VariableExpression
 sealed class VariableSequenceExpression
-data class VariableInt(val name: String, var value: Int) : VariableIntExpression()
+data class Variable(val name: String, var value: Double) : VariableExpression()
 data class VariableSequence(val name: String, var value: List<Int>) : VariableSequenceExpression(), List<Int> {
     override val size: Int
         get() = value.size
@@ -64,7 +64,7 @@ data class VariableSequence(val name: String, var value: List<Int>) : VariableSe
         TODO("Not yet implemented")
     }
 
-    fun reduce(zeroElement: Int, operation: String): Int {
+    fun reduce(zeroElement: Double, operation: String): Double {
         var result = zeroElement
         for (element in value) {
             when (operation) {
@@ -81,6 +81,23 @@ fun customExit(name: String, e: Exception) {
         "\tError massage - $e\n" +
                 "Undefined variable $name\nYou need to define variable before using it!!!!!!!!!!"
     )
+}
+
+fun checkForInt(value: Double): Boolean {
+    return value % 1 < 0.01
+}
+
+fun convertoInt(value: Double): Int {
+    return if (checkForInt(value)) {
+        value.toInt()
+    } else {
+        typemismatch(Double, Int)
+        exitProcess(1)
+    }
+}
+
+fun <T, E> typemismatch(actual: T, expected: E) {
+    println("\tType mismatch: expected: $expected, given: $actual")
 }
 
 
@@ -112,45 +129,39 @@ object MyGrammar : Grammar<Any>() {
 
 //    val any by zeroOrMore( varToken or equal or mapToken or reduceToken or outputToken or print or num or impl or mul or pow or div or minus or plus or lpar or rpar or lfigpar or rfigpar or id or not or comma or ws )
 
-    private val varIntMap = mutableMapOf<String, VariableInt>()
+    private val varMap = mutableMapOf<String, Variable>()
     private val varSeqMap = mutableMapOf<String, VariableSequence>()
 //    private val intUnnamed = mutableMapOf<String, VariableInt>()
 
-    private fun seqValToListInt(t1: Any, t2: Any): List<Int> {
-        val start = if (t1 is TokenMatch) {
+    private fun anyToInt(t: Any): Int {
+        return if (t is TokenMatch) {
             try {
-                varIntMap[t1.text]!!.value
+                convertoInt(varMap[t.text]!!.value)
             } catch (e: NullPointerException) {
-                customExit(t1.text, e)
+                customExit(t.text, e)
                 exitProcess(1)
             }
-        } else t1 as Int
-        val end = if (t2 is TokenMatch) {
-            try {
-                varIntMap[t2.text]!!.value
-            } catch (e: NullPointerException) {
-                customExit(t2.text, e)
-                exitProcess(1)
-            }
-        } else t2 as Int
-        return (start..end).toList()
+        } else {
+            convertoInt(t as Double)
+        }
     }
 
+    private fun seqValToListInt(t1: Any, t2: Any): List<Int> {
+        return (anyToInt(t1)..anyToInt(t2)).toList()
+    }
+
+    //TODO Необходимо модифицировать MyGrammarSimple для обработки Double значений
     private fun parseMap(variable: String, sequence: VariableSequence, stringForParse: String): VariableSequence {
         val resultOfMap = mutableListOf<Int>()
-        println(stringForParse)
         val stringForInput = stringForParse.substring(0, stringForParse.length - 1)
         for (item in sequence.value) {
-            println(stringForInput)
             val parser = MyGrammarSimple.parseToEnd(stringForInput.replace(variable, item.toString()))
-            println(parser)
             resultOfMap.add(parser)
         }
-        println(resultOfMap)
         return VariableSequence("", resultOfMap)
     }
 
-    private val number by num use { text.toInt() }
+    private val number by num use { text.toDouble() }
 
     private val sequenceValue by -lfigpar *
             (number or parser { id }) *
@@ -160,14 +171,13 @@ object MyGrammar : Grammar<Any>() {
 
     private val namedVariableInt by
     -varToken * parser { id } * -equal * parser { subSumChain } use {
-        VariableInt(this.t1.text, (this.t2 as Int)).also { newVar ->
-            varIntMap[newVar.name] = newVar
-            println(varIntMap)
+        Variable(this.t1.text, (this.t2 as Double)).also { newVar ->
+            varMap[newVar.name] = newVar
         }
     } or (parser { id } * -equal * parser { subSumChain } use {
         try {
-            varIntMap[this.t1.text]!!.value = (this.t2 as Int)
-            varIntMap[this.t1.text]!!
+            varMap[this.t1.text]!!.value = (this.t2 as Double)
+            varMap[this.t1.text]!!
         } catch (e: NullPointerException) {
             customExit(this.t1.text, e)
             exitProcess(1)
@@ -178,7 +188,6 @@ object MyGrammar : Grammar<Any>() {
     -varToken * parser{ id } * -equal * (parser { seqVariable} or parser { map }) map {
         VariableSequence(it.t1.text, it.t2.value).also { newVar ->
             varSeqMap[newVar.name] = newVar
-            println(varSeqMap)
         }
     } or (parser { id } * -equal * (parser { seqVariable} or parser { map }) map {
         try {
@@ -195,8 +204,8 @@ object MyGrammar : Grammar<Any>() {
             (namedVariableSequence use { this }) or
             (parser(this::id) use {  // already set variable
                 try {
-                    if (text in varIntMap.keys) {
-                        varIntMap[text]!!.value
+                    if (text in varMap.keys) {
+                        varMap[text]!!.value
                     } else {
                         varSeqMap[text]!!
                     }
@@ -270,8 +279,12 @@ object MyGrammar : Grammar<Any>() {
     //DONE
     private val output by -outputToken * parser { id } use {
         try {
-            if (this.text in varIntMap.keys) {
-                println("${varIntMap[text]!!.value}")
+            if (this.text in varMap.keys) {
+                if (checkForInt(varMap[text]!!.value)) {
+                    println(convertoInt(varMap[text]!!.value))
+                } else {
+                    println(varMap[text]!!.value)
+                }
             } else {
                 println("${varSeqMap[text]!!.value}")
             }

@@ -23,8 +23,9 @@ object MyGrammarSimple : Grammar<Int>() {
     val ws by regexToken("\\s+", ignore = true)
 
     val number by num use {
-        println(text)
-        text.toDouble().toInt() }
+        convertoInt(text.toDouble())
+    }
+
     val term: Parser<Int> by number or
             (skip(minus) and parser(::term) map { -it }) or
             (skip(lpar) and parser(::rootParser) and skip(rpar))
@@ -41,9 +42,3 @@ object MyGrammarSimple : Grammar<Int>() {
 
     override val rootParser: Parser<Int> by subSumChain
 }
-
-/*
-private val map by -MyGrammar.mapToken * -MyGrammar.lpar * parser { MyGrammar.seqVariable } * -MyGrammar.comma * MyGrammar.id * MyGrammar.mapLamda * -MyGrammar.rpar map {
-    println(it.t3)
-    VariableSequence("t", listOf())
-}*/
