@@ -21,7 +21,7 @@ object MyGrammarSimple : Grammar<Int>() {
     val ws by regexToken("\\s+", ignore = true)
 
     val number by num use {
-        convertoInt(text.toDouble())
+        converToInt(text.toDouble())
     }
 
     val term: Parser<Int> by number or

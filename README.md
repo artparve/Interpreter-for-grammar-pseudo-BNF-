@@ -7,3 +7,4 @@ Books:
 Plan for Future:
  - Restore order in Parser types to get rid of frequent explicit conversions of numbers "Any -> Double"
  - Rewrite MyGrammar and MyGrammarSimple objects into classes so that inheritance can be used, thereby reducing duplicate code.
+ - Some Updates are needed to improve error output

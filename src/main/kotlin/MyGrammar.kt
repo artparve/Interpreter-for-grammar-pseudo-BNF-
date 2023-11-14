@@ -14,9 +14,17 @@ import kotlin.system.exitProcess
 sealed class VariableExpression
 sealed class VariableSequenceExpression
 data class Variable(val name: String, var value: Double) : VariableExpression()
+
+//TODo value -> List<Double>
 data class VariableSequence(val name: String, var value: List<Int>) : VariableSequenceExpression(), List<Int> {
     override val size: Int
         get() = value.size
+
+
+    var random_number: Int = 0
+        set(value) {
+            field = value * 37 % 11
+        }
 
     override fun contains(element: Int): Boolean {
         TODO("Not yet implemented")
@@ -70,32 +78,35 @@ data class VariableSequence(val name: String, var value: List<Int>) : VariableSe
     }
 }
 
-fun customExit(name: String, e: Exception) {
-    println(
-        "\tError massage - $e\n" +
-                "Undefined variable $name\nYou need to define variable before using it!!!!!!!!!!"
-    )
-}
+fun checkForInt(value: Double): Boolean = value % 1 < 0.01
 
-fun checkForInt(value: Double): Boolean {
-    return value % 1 < 0.01
-}
-
-fun convertoInt(value: Double): Int {
-    return if (checkForInt(value)) {
+fun converToInt(value: Double): Int =
+    if (checkForInt(value)) {
         value.toInt()
     } else {
-        typemismatch(Double, Int)
+        typeMismatch(Double, Int)
         exitProcess(1)
     }
-}
 
-fun <T, E> typemismatch(actual: T, expected: E) {
+
+fun <T, E> typeMismatch(actual: T, expected: E) {
     println("\tType mismatch: expected: $expected, given: $actual")
 }
 
 
-object MyGrammar : Grammar<Any>() {
+class MyGrammar : Grammar<Any>() {
+
+    private val buffer = StringBuilder()
+
+    fun getResult(): String = buffer.toString()
+    fun customExit(name: String, exseption: String): Nothing {
+        buffer.appendLine(
+            "\tError massage - $exseption\n" +
+                    "Undefined variable $name\nYou need to define variable before using it!!!!!!!!!!"
+        )
+        exitProcess(1)
+    }
+
     private val regexForReduce = """[+*]"""
     private val regexForMap = """->\s*(.+)"""
     private val text by regexToken(""""[^"]*"""")
@@ -124,22 +135,14 @@ object MyGrammar : Grammar<Any>() {
     private val varMap = mutableMapOf<String, Variable>()
     private val varSeqMap = mutableMapOf<String, VariableSequence>()
 
-    private fun anyToInt(t: Any): Int {
-        return if (t is TokenMatch) {
-            try {
-                convertoInt(varMap[t.text]!!.value)
-            } catch (e: NullPointerException) {
-                customExit(t.text, e)
-                exitProcess(1)
-            }
-        } else {
-            convertoInt(t as Double)
-        }
+    private fun anyToInt(t: Any): Int? = if (t is TokenMatch) {
+        //FIXME Для всех ошибок
+        varMap[t.text]?.value?.let { converToInt(it) } ?: customExit(t.text, "NullPointerException")
+    } else {
+        converToInt(t as Double)
     }
 
-    private fun seqValToListInt(t1: Any, t2: Any): List<Int> {
-        return (anyToInt(t1)..anyToInt(t2)).toList()
-    }
+    private fun seqValToListInt(t1: Any, t2: Any): List<Int> = (anyToInt(t1)!!..anyToInt(t2)!!).toList()
 
     private fun parseMap(variable: String, sequence: VariableSequence, stringForParse: String): VariableSequence {
         val resultOfMap = mutableListOf<Int>()
@@ -165,13 +168,10 @@ object MyGrammar : Grammar<Any>() {
             varMap[newVar.name] = newVar
         }
     } or (parser { id } * -equal * parser { subSumChain } use {
-        try {
-            varMap[this.t1.text]!!.value = (this.t2 as Double)
-            varMap[this.t1.text]!!
-        } catch (e: NullPointerException) {
-            customExit(this.t1.text, e)
-            exitProcess(1)
-        }
+        varMap[this.t1.text]?.let {
+            it.value = (this.t2 as Double)
+            it
+        } ?: customExit(this.t1.text, "NullPointerException")
     })
 
     private val namedVariableSequence by
@@ -180,16 +180,13 @@ object MyGrammar : Grammar<Any>() {
             varSeqMap[newVar.name] = newVar
         }
     } or (parser { id } * -equal * (parser { seqVariable } or parser { map }) map {
-        try {
-            varSeqMap[it.t1.text]!!.value = VariableSequence(it.t1.text, it.t2.value)
-            varSeqMap[it.t1.text]!!
-        } catch (e: NullPointerException) {
-            customExit(it.t1.text, e)
-            exitProcess(1)
-        }
+        varSeqMap[it.t1.text]?.let { seq ->
+            seq.value = VariableSequence(it.t1.text, it.t2.value)
+            seq
+        } ?: customExit(it.t1.text, "NullPointerException")
     })
 
-
+    //TODO Number superclass
     private val variable by ((namedVariable use { value }) or
             (namedVariableSequence use { this }) or
             (parser(this::id) use {  // already set variable
@@ -200,8 +197,7 @@ object MyGrammar : Grammar<Any>() {
                         varSeqMap[text]!!
                     }
                 } catch (e: NullPointerException) {
-                    customExit(this.text, e)
-                    exitProcess(1)
+                    customExit(this.text, "NullPointerException")
                 }
             })
             )
@@ -233,7 +229,8 @@ object MyGrammar : Grammar<Any>() {
         }
     }
 
-    //DONE
+    //TODO Изменить тип на Double -> изменить тип variable на Double -> rootParser тоже должен быть Double
+    //TODO Или как-то ещё
     private val term: Parser<Any> by number or
             (skip(minus) and parser(::term) map { it }) or
             variable or reduce or
@@ -256,25 +253,22 @@ object MyGrammar : Grammar<Any>() {
 
     // DONE
     private val printText by -print * text use {
-        print(this.text.substring(1, this.text.length - 1))
+        buffer.append(this.text.substring(1, this.text.length - 1))
         0
     }
 
     //DONE
     private val output by -outputToken * parser { id } use {
         try {
-            if (this.text in varMap.keys) {
-                if (checkForInt(varMap[text]!!.value)) {
-                    println(convertoInt(varMap[text]!!.value))
+            varMap[text]?.value?.let {
+                if (checkForInt(it)) {
+                    buffer.appendLine(converToInt(it))
                 } else {
-                    println(varMap[text]!!.value)
+                    buffer.appendLine(it)
                 }
-            } else {
-                println("${varSeqMap[text]!!.value}")
-            }
+            } ?: buffer.appendLine("${varSeqMap[text]!!.value}")
         } catch (e: NullPointerException) {
-            customExit(this.text, e)
-            exitProcess(1)
+            customExit(this.text, "NullPointerException")
         }
     }
 
